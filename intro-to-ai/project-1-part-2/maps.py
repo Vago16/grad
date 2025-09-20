@@ -24,21 +24,33 @@ def terrain_symbol(t: Terrain):   #t is the argument for terrain symbol(a single
         }
     return symbols[t]
 
-def print_map(map, num=None):     #takes map as first arg, and then map number(num) as second arg
+def print_map(map, num=None):     #takes map as first arg and then map number(num) as second arg
     '''
-    Print the map with terrain and resources
+    Print the map with terrain.
     '''
+
     if num is not None:     #prints map number if provided
         print(f"Map {num}:")
     for line in map:
-        symbols = []        #empty list to append to 
+        symbols = []        #empty list to append to, to print to terminal
         for tile in line:
             symbols.append(terrain_symbol(tile))
         print(" ".join(symbols))
     print()     #newline for space
 
-#(map, res=None):
-   # pass
+def print_resource_list(resource_list, num=None):   #takes resource list as first arg and then map number(num) as second arg
+    '''
+    Print resource list for a given map.
+    '''
+    
+    if num is not None:     #prints map number for resource list if provided
+        print(f"Map {num} resource list:")
+
+    for resource, coordinate in resource_list.items():      #gets the tuple of the key-value pairs from the dicitonary
+        print(f"{resource}: {coordinate}")
+
+    print() #newline for space
+
 
 #initiliaze dictionary for costs of traversing different terrains
 #this shows additional costs of traversing terrain
@@ -79,25 +91,28 @@ map_3 = [
 
 #list of resources to collect for map_1
 resource_list_1 = {
-    "stone": [(0,2), (2,1), (3,4)],  #list of where the 3 stones are in the map
-    "iron": [(1,4), (4,0)],    #list of where the 2 irons are in the map
-    "crystal": [(1,2)]   #list of where the 1 crystal is in the map
+    "Stone": [(0,2), (2,1), (3,4)],  #list of where the 3 stones are in the map
+    "Iron": [(1,4), (4,0)],    #list of where the 2 irons are in the map
+    "Crystal": [(1,2)]   #list of where the 1 crystal is in the map
 }
 
 #list of resources to collect for map_2
 resource_list_2 = {
-    "stone": [(1,1), (2,2), (3,3)],  #list of where the 3 stones are in the map
-    "iron": [(2,4), (4,2)],    #list of where the 2 irons are in the map
-    "crystal": [(4,0)]   #list of where the 1 crystal is in the map
+    "Stone": [(1,1), (2,2), (3,3)],  #list of where the 3 stones are in the map
+    "Iron": [(2,4), (4,2)],    #list of where the 2 irons are in the map
+    "Crystal": [(4,0)]   #list of where the 1 crystal is in the map
 }
 
 #list of resources to collect for map_3
 resource_list_3 = {
-    "stone": [(0,1), (0,2), (0,3)],  #list of where the 3 stones are in the map
-    "iron": [(0,4), (1,4)],    #list of where the 2 irons are in the map
-    "crystal": [(2,4)]   #list of where the 1 crystal is in the map
+    "Stone": [(0,1), (0,2), (0,3)],  #list of where the 3 stones are in the map
+    "Iron": [(0,4), (1,4)],    #list of where the 2 irons are in the map
+    "Crystal": [(2,4)]   #list of where the 1 crystal is in the map
 }
 
 print_map(map_1, 1)
+print_resource_list(resource_list_1, 1)
 print_map(map_2, 2)
+print_resource_list(resource_list_2, 2)
 print_map(map_3, 3)
+print_resource_list(resource_list_3, 3)

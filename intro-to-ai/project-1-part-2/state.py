@@ -1,0 +1,1 @@
+#represents state of the map
