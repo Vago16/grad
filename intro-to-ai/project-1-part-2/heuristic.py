@@ -1,5 +1,5 @@
 import state
-#A* seach algorithm and accompanying heuristic
+#Heuristic for the search algorithm
 
 #admissible heuristic function, used https://www.geeksforgeeks.org/artificial-intelligence/heuristic-function-in-ai/ for help in understanding further
 def heuristic(state):
@@ -49,3 +49,4 @@ def heuristic(state):
     if not distances:   #make sure distances list is not empty to prevent min() function from crashing/acting unexpectedly
         return 0
     return min(distances)
+
