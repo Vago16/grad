@@ -101,7 +101,13 @@ def get_neighbor(state, given_map, terrain_costs):
 
     return neighbors
 
-
+#function to see if the goal has been met(3 stones, 2 irons, and 1 crystal delivered to base)
+def check_goal(state):
+    return (
+        state.finished["Stone"] >= 3 and
+        state.finished["Iron"] >= 2 and
+        state.finished["Crystal"] >= 1
+    )
 
 #####TESTS#####
 #testing to see if state class and functions work
