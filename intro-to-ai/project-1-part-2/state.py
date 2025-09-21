@@ -1,4 +1,6 @@
-#represents state of the map
+import maps
+
+#represents state(node) of the map
 
 #define class for state of the map, each object of state class represents a node in search
 class State:
@@ -25,6 +27,33 @@ class State:
     def __repr__(self):     #print out state
         return f"Position: {self.pos}, Contents in Backpack: {self.backpack}, Resources delivered: {self.finished}"
 
+#move function to move the agent to adjacent tiles
+def move_agent():
+    '''
+    Move the agent to a new position on the map and pick up/drop off resources
+    '''
+    pass
+
+#get_neighbor function
+#I got some help from https://stackoverflow.com/questions/77274736/how-to-find-neighbors-in-a-grid for figuring it out
+def get_neighbor(state, map, resource_list, terrain_costs):
+    '''
+    Return a list of all adjacent(neighbor) states from current state 
+    and their movement costs.
+    '''
+    neighbors = []     #list to be appended and returned at end of function
+    rows, columns = len(map), len(map[0])   #gets the dimensions of the map
+    curr_row, curr_col = state.pos
+
+    directions = [(-1,0), (1,0), (0,-1), (0,1)] #all the possible directions that can be moved to in a 2-D array
+
+    for dir_row, dir_col in directions:   #for each direction
+        neighor_row, neighbor_col = curr_row + dir_row, curr_col + dir_col
+
+
+
+
+#####TESTS#####
 #testing to see if state class and functions work
 state1 = State(
     pos=(0, 0),
@@ -43,6 +72,7 @@ state3 = State(
     backpack=(),
     finished={"Stone": 0, "Iron": 1, "Crystal": 0}
 )
+
 #testing equality
 print(state1 == state2)
 print(state1 == state3)
