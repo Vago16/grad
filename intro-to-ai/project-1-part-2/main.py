@@ -6,8 +6,10 @@ import heapq        #for priority queue data structure
 
 ########helper functions for A*#######
 
-#function that returns True when the base has enough of each resource needed
 def goal_reached(state):
+    '''
+    Function that returns True when the base has enough of each resource needed
+    '''
     #initialize dict of how many resources are required for goal state from beginning
     required = {
         "Stone": 3,
@@ -20,8 +22,18 @@ def goal_reached(state):
             return False
     return True
 
-#function to reconstruct path
+def make_path(state, parents):
+    '''
+    Uses parent nodes to reconstruct path
+    '''
+    #initialize empty list for path to tackle
+    path = []
+    while state is not None:    #while there is a state, add the state to the path list, then go to the parent node
+        path.append(state)
+        state = parents[state]
+    path.reverse()  #reverse order so its order is from start to end instead of end to start
 
+    return path
 
 ######A* Search Algorithm#######
 
@@ -34,7 +46,8 @@ def astar(initial_state, given_map, terrain_costs):
     '''
     #initialize empty list for the priority queue to be the frontier(the open list)
     open_list = []
-    heapq.heappush(open_list, heuristic(initial_state), 0, initial_state, None)
+    #heapq.heappush method takes two args
+    heapq.heappush(open_list, (heuristic.heuristic(initial_state), 0, initial_state, None))
 
     #initialize empty set for closed list(states already visited)
     closed_set = set()
@@ -53,9 +66,22 @@ def astar(initial_state, given_map, terrain_costs):
         #save parent pointer off the popped current(curr variable)
         parents[curr] = parent
 
-        #check if goal has been met, and if so, call function to reconstruct path used
+        #check if goal has been met, and if so, call function to reconstruct path used from start state to goal state
         if goal_reached(curr):
-            pass
+            return make_path(curr, parents)
+        
+        #after current node has been explored, add to closed list so it wont be expanded into(not in frontier anymore)
+        closed_set.add(curr)
 
-    #if went through whole search with no goal
+        #iterate through calling of get_neighbor function to check all adjacent tiles and get heuristic
+        for neighbor, cost in state.get_neighbor(curr, given_map, terrain_costs):
+            if neighbor in closed_set:      #neighbor has already been expanded into, so it can be skipped
+                continue
+            #once again dealing with f = g + h, the total path cost(priority value), where g is the cost so far and h is heuristic estimation  
+            n_g = g + cost
+            n_f = n_g + heuristic.heuristic(neighbor) #gets heuristic estimation of neighbor
+            #push to priority queue, current node becomes the parent for neighbor as curr variable is passed to parent pointer arg
+            heapq.heappush(open_list, (n_f, n_g, neighbor, curr))
+
+    #if search went through whole search with no goal
     return None
