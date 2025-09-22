@@ -1,4 +1,3 @@
-import state
 #Heuristic for the search algorithm
 
 #admissible heuristic function, used https://www.geeksforgeeks.org/artificial-intelligence/heuristic-function-in-ai/ for help in understanding further

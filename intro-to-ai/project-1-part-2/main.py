@@ -1,87 +1,95 @@
 import maps
 import state
-import heuristic
-import heapq        #for priority queue data structure
-# main file that contains the A* seach algorithm
+import astar
+#run the search algorithm
+#will work on OOP more in editing for less repetitive code
 
-########helper functions for A*#######
+###MAP 1###
+#create the initial state for map_1
+initial_state_1 = state.State(
+    pos=(0,0),
+    backpack=(),
+    finished={"Stone": 0, "Iron": 0, "Crystal": 0},
+    resources=maps.resource_list_1
+    )
 
-def goal_reached(state):
-    '''
-    Function that returns True when the base has enough of each resource needed
-    '''
-    #initialize dict of how many resources are required for goal state from beginning
-    required = {
-        "Stone": 3,
-        "Iron": 2,
-        "Crystal": 1
-        }
-    #if not enough of any resource, return False, otherwise, function returns True
-    for resource, num in required.items():
-        if state.finished[resource] < num:
-            return False
-    return True
+#run astar for map_1
+path_1 = astar.astar(initial_state_1, maps.map_1, maps.terrain_costs)
 
-def make_path(state, parents):
-    '''
-    Uses parent nodes to reconstruct path
-    '''
-    #initialize empty list for path to tackle
-    path = []
-    while state is not None:    #while there is a state, add the state to the path list, then go to the parent node
-        path.append(state)
-        state = parents[state]
-    path.reverse()  #reverse order so its order is from start to end instead of end to start
-
-    return path
-
-######A* Search Algorithm#######
-
-#implementation of A*, idea for heapq help came from https://www.datacamp.com/tutorial/a-star-algorithm
-def astar(initial_state, given_map, terrain_costs):
-    '''
-    initial_state: the State object representing base and start of the search((0,0), 
-        no resources in bag, and all resources on map still)
-    given_map, terrain_costs: args for get_neighbor function from state.py
-    '''
-    #initialize empty list for the priority queue to be the frontier(the open list)
-    open_list = []
-    #heapq.heappush method takes two args
-    heapq.heappush(open_list, (heuristic.heuristic(initial_state), 0, initial_state, None))
-
-    #initialize empty set for closed list(states already visited)
-    closed_set = set()
-    #initialize empty dict for parent states
-    parents = {}
-
-    #main loop - go through open list 
-    while open_list:
-        #f = g + h, the total path cost, where g is the cost so far and h is heuristic estimation
-        f, g, curr, parent = heapq.heappop(open_list)
-
-        #skip if duplicate state(already seen)
-        if curr in closed_set:
-            continue
-
-        #save parent pointer off the popped current(curr variable)
-        parents[curr] = parent
-
-        #check if goal has been met, and if so, call function to reconstruct path used from start state to goal state
-        if goal_reached(curr):
-            return make_path(curr, parents)
+if path_1:
+    total_cost = 0  #start tallying total cost
+    previous_state = None   #there is no previous state at first
+    maps.print_map(maps.map_1, 1)   #print map
+    print("Path taken and total cost:")
+    for s in path_1:
+        coordinate = s.pos
+        if previous_state is not None:  #if there is a previous state
+            terrain = maps.map_1[coordinate[0]][coordinate[1]]      #takes row and coloumn of coordinate and finds terrain
+            movement_cost = maps.terrain_costs[terrain] + 1     #gets movement cost for the specific terrain tile
+            total_cost += movement_cost
         
-        #after current node has been explored, add to closed list so it wont be expanded into(not in frontier anymore)
-        closed_set.add(curr)
+        print(f"{coordinate}, Total cost so far: {total_cost}")
+        previous_state = s     #adds in previous state
+else:
+    print("No path for map_1 found.")
 
-        #iterate through calling of get_neighbor function to check all adjacent tiles and get heuristic
-        for neighbor, cost in state.get_neighbor(curr, given_map, terrain_costs):
-            if neighbor in closed_set:      #neighbor has already been expanded into, so it can be skipped
-                continue
-            #once again dealing with f = g + h, the total path cost(priority value), where g is the cost so far and h is heuristic estimation  
-            n_g = g + cost
-            n_f = n_g + heuristic.heuristic(neighbor) #gets heuristic estimation of neighbor
-            #push to priority queue, current node becomes the parent for neighbor as curr variable is passed to parent pointer arg
-            heapq.heappush(open_list, (n_f, n_g, neighbor, curr))
+print()
+###MAP 2###
+#create the initial state for map_2
+initial_state_2 = state.State(
+    pos=(0,0),
+    backpack=(),
+    finished={"Stone": 0, "Iron": 0, "Crystal": 0},
+    resources=maps.resource_list_2
+    )
 
-    #if search went through whole search with no goal
-    return None
+#run astar for map_1
+path_2 = astar.astar(initial_state_2, maps.map_2, maps.terrain_costs)
+
+if path_2:
+    total_cost = 0  #start tallying total cost
+    previous_state = None   #there is no previous state at first
+    maps.print_map(maps.map_2, 2)
+    print("Path taken and total cost:")
+    for s in path_2:
+        coordinate = s.pos
+        if previous_state is not None:  #if there is a previous state
+            terrain = maps.map_2[coordinate[0]][coordinate[1]]      #takes row and coloumn of coordinate and finds terrain
+            movement_cost = maps.terrain_costs[terrain] + 1     #gets movement cost for the specific terrain tile
+            total_cost += movement_cost
+        
+        print(f"{coordinate}, Total cost so far: {total_cost}")
+        previous_state = s      #adds in previous state
+else:
+    print("No path for map_2 found.")
+
+print()
+#create the initial state for map_3
+initial_state_3 = state.State(
+    pos=(0,0),
+    backpack=(),
+    finished={"Stone": 0, "Iron": 0, "Crystal": 0},
+    resources=maps.resource_list_3
+    )
+
+#run astar for map_3
+path_3 = astar.astar(initial_state_3, maps.map_3, maps.terrain_costs)
+
+if path_3:
+    total_cost = 0  #start tallying total cost
+    previous_state = None   #there is no previous state at first
+    maps.print_map(maps.map_3, 3)
+    print("Path taken and total cost:")
+    for s in path_3:
+        coordinate = s.pos
+        if previous_state is not None:  #if there is a previous state
+            terrain = maps.map_3[coordinate[0]][coordinate[1]]      #takes row and coloumn of coordinate and finds terrain
+            movement_cost = maps.terrain_costs[terrain] + 1     #gets movement cost for the specific terrain tile
+            total_cost += movement_cost
+        
+        print(f"{coordinate}, Total cost so far: {total_cost}")
+        previous_state = s      #adds in previous state
+else:
+    print("No path for map_3 found.")
+
+print()

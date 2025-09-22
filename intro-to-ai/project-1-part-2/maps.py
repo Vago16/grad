@@ -110,9 +110,3 @@ resource_list_3 = {
     "Crystal": [(2,4)]   #list of where the 1 crystal is in the map
 }
 
-print_map(map_1, 1)
-print_resource_list(resource_list_1, 1)
-print_map(map_2, 2)
-print_resource_list(resource_list_2, 2)
-print_map(map_3, 3)
-print_resource_list(resource_list_3, 3)
