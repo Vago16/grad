@@ -76,13 +76,20 @@ def move_agent(state, new_pos, given_map, terrain_costs):
 
     #check player's turn 
     if state.turn =="a":
-        #curr_pos = state.pos_a
         new_pack = list(state.backpack_a)
         base = (0,0)    #player a's base
+        other_pos = state.pos_b #position of other player
+        next_turn = "b"
     else:
-        #curr_pos = state.pos_b
         new_pack = list(state.backpack_b)
         base = (4,4)    #player b's base
+        other_pos = state.pos_a #position of other player
+        next_turn = "a"
+
+
+    ###Conflict Rule###
+    if new_pos == other_pos:    #turn player has priority to move to the tile, so if there is someone already on tile, skip turn
+        return state
 
     #if the tile has resource and backpack has space, pick up resource
     for resource, coordinate in new_resources.items(): #iterate through coordinates and resource items in the list
@@ -105,7 +112,7 @@ def move_agent(state, new_pos, given_map, terrain_costs):
         backpack_b=state.backpack_b,
         finished=new_finished,
         resources=new_resources,
-        turn="b"    #switch turn
+        turn=next_turn    #switch turn
     )
     else:
         new_state = State(
@@ -115,7 +122,7 @@ def move_agent(state, new_pos, given_map, terrain_costs):
         backpack_b=new_pack,
         finished=new_finished,
         resources=new_resources,
-        turn="a"    #switch turn
+        turn=next_turn    #switch turn
     )
     return new_state
 
@@ -144,6 +151,10 @@ def get_neighbor(state, given_map, terrain_costs):
         if 0 <= neighbor_row < rows and 0 <= neighbor_col < columns:    #makes sure that the agent cannot move off the map in error
             new_pos = (neighbor_row, neighbor_col)  #stores neighboring states positions
             neighbor_state = move_agent(state, new_pos, given_map, terrain_costs)     #call move_agent function to move agent
+
+            ##skip useless branches to limit depth of search##
+            if neighbor_state == state:
+                continue
 
             #get the cost for moved onto tile/terrain
             terrain = given_map[neighbor_row][neighbor_col]
