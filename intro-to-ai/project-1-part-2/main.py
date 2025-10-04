@@ -1,6 +1,6 @@
 import maps
 import state
-import astar
+import minimax
 #run the search algorithm
 #will work on OOP more in editing for less repetitive code
 
