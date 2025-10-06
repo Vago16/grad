@@ -54,8 +54,9 @@ def print_resource_list(resource_list, num=None):   #takes resource list as firs
 
 #initiliaze dictionary for costs of traversing different terrains
 #this shows additional costs of traversing terrain
+#any tiles that may have been in (4,4) are now replaced by a base
 terrain_costs = {
-    Terrain.base: 0,      #1 base tile always in 0,0
+    Terrain.base: 0,      #2 base tiles always in 0,0 and (4,4)
     Terrain.empty: 0,    #for simplicity, 5 empty tiles  
     Terrain.grasslands: 1,    #5 grassland tiles
     Terrain.hills: 2,         #5 hill tiles
@@ -68,7 +69,7 @@ map_1 = [
     [3, 1, 4, 1, 2],
     [1, 4, 1, 3, 3],
     [2, 4, 5, 4, 3],
-    [5, 4, 2, 3, 2]
+    [5, 4, 2, 3, 0]
 ]
 
 #2-D array representation of the first map
@@ -77,7 +78,7 @@ map_2 = [
     [1, 1, 4, 4, 3],
     [4, 4, 1, 2, 3],
     [5, 3, 2, 1, 2],
-    [5, 3, 3, 2, 2]
+    [5, 3, 3, 2, 0]
 ]
 
 #simple straightforward map mainly for testing to make sure search alg works 
@@ -86,7 +87,7 @@ map_3 = [
     [5, 5, 5, 5, 1],
     [4, 4, 4, 4, 2],
     [4, 2, 2, 3, 2],
-    [3, 3, 3, 3, 3]
+    [3, 3, 3, 3, 0]
 ]
 
 #list of resources to collect for map_1

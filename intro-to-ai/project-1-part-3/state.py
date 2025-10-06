@@ -3,28 +3,40 @@ import maps
 #represents state(node) of the map
 
 #define class for state of the map, each object of state class represents a node in search
+#now include two players, a and b, in position and backpack, and turns
 class State:
-    def __init__(self, pos, backpack, finished, resources):
+    def __init__(self, pos_a, pos_b, backpack_a, backpack_b, finished, resources, turn):
         '''
         pos- tuple showing position on the map in row and column of the agent
         backpack- tuple representing leather backpack that can only hold up to two resources at a time at most
         finished- a dict with the resources that have been taken successfully to the base(0,0) coordinate
         resources- a dictionary with a list of copies of each resource
         '''
-        self.pos = pos
-        self.backpack = tuple(backpack)
-        self.finished = dict(finished) 
+        self.pos_a = pos_a
+        self.pos_b = pos_b
+        self.backpack_a = tuple(backpack_a)
+        self.backpack_b = tuple(backpack_b)
+        #seperate dicts depending on player
+        self.finished = {
+            "a": dict(finished.get("a", {"stone":0, "iron":0, "crystal":0})),
+            "b": dict(finished.get("b", {"stone":0, "iron":0, "crystal":0})),
+        }
 
         self.resources = {}
         for resource, coordinates in resources.items(): #iterate through each of the items(resources) and go through each tile on the map
             self.resources[resource] = list(coordinates)
+
+        self.turn = turn
     
     def __eq__(self, other):        #checks state against another specified state to see if they are equal(position, contents of backpack, and however many resources have been taken to base)
         return(
-            self.pos == other.pos and
-            self.backpack == other.backpack and
+            self.pos_a == other.pos_a and
+            self.pos_b == other.pos_b and
+            self.backpack_a == other.backpack_a and
+            self.backpack_b == other.backpack_b and
             self.finished == other.finished and
-            self.resources == other.resources
+            self.resources == other.resources and
+            self.turn == other.turn
         )
     
     def __hash__(self):     #hash the state(making tuple out of self.finished lets it be hashable)
@@ -33,23 +45,51 @@ class State:
             resource_items.append((resource, tuple(coordinates)))       #convert each list to tuples before appending to allow hashing
         resources_tupled = tuple(resource_items)        #convert overall list to tuple
 
-        return hash((self.pos, self.backpack, tuple(self.finished.items()), resources_tupled))
+        #converts finished into tuple so it can be hashed
+        finished_tuple = (tuple(self.finished["a"].items()),
+                          tuple(self.finished["b"].items()))
+        
+        return hash((self.pos_a, self.backpack_a, 
+                     self.pos_b, self.backpack_b,
+                     finished_tuple, resources_tupled, self.turn))
 
-    def __repr__(self):     #print out state
-        return f"Position: {self.pos}, Contents in Backpack: {self.backpack}, Resources delivered: {self.finished}, Resources left: {self.resources}"
+    def __repr__(self):     #print out state for both players
+        return (f"Player 1 Status - Position: {self.pos_a}, Contents in Backpack: {self.backpack_a}.  " 
+                f"Player 2 Status - Position: {self.pos_b}, Contents in Backpack: {self.backpack_b}.  " 
+                f"Resources delivered: {self.finished}.  Resources left: {self.resources}.  "
+                f"Turn: {self.turn}")
 
 #move function to handle moving the agent to adjacent tiles
-def move_agent(state, new_pos, given_map, terrain_costs):
+def move_agent(state_obj, new_pos, given_map, terrain_costs):
     '''
-    Move the agent to a new position on the map and pick up/drop off resources
+    Move the agent(a or b) to a new position on the map and pick up/drop off resources
     '''
-    #copy backpack and its contents(if any) to a list, and copy delivered resources to a dict
-    new_pack = list(state.backpack) 
-    new_finished = dict(state.finished)
+    #copy delivered resources to a dict for both players
+    new_finished = {
+    "a": dict(state_obj.finished["a"]),
+    "b": dict(state_obj.finished["b"])
+}
     #make a dict copy of resouces that will not modify original state
     new_resources = {}
-    for resource, coordinates in state.resources.items(): #iterate through each of the items(resources) and go through each tile on the map
+    for resource, coordinates in state_obj.resources.items(): #iterate through each of the items(resources) and go through each tile on the map
         new_resources[resource] = list(coordinates)
+
+    #check player's turn 
+    if state_obj.turn =="a":
+        new_pack = list(state_obj.backpack_a)
+        base = (0,0)    #player a's base
+        other_pos = state_obj.pos_b #position of other player
+        next_turn = "b"
+    else:
+        new_pack = list(state_obj.backpack_b)
+        base = (4,4)    #player b's base
+        other_pos = state_obj.pos_a #position of other player
+        next_turn = "a"
+
+
+    ###Conflict Rule###
+   # if new_pos == other_pos:    #turn player has priority to move to the tile, so if there is someone already on tile, skip turn
+    #    return state
 
     #if the tile has resource and backpack has space, pick up resource
     for resource, coordinate in new_resources.items(): #iterate through coordinates and resource items in the list
@@ -58,29 +98,49 @@ def move_agent(state, new_pos, given_map, terrain_costs):
             coordinate.remove(new_pos) #remove resource from map
 
     #if the tile is the base tile
-    if new_pos == (0,0) and new_pack:   #(0,0) is always base and makes sure there is a new_pack variable that is True
+    if new_pos == base and new_pack:   #(0,0) is always base and makes sure there is a new_pack variable that is True
         for resource in new_pack:
-            new_finished[resource] += 1     #add resources to count 
-        new_pack = []       #empty backpack completely
+            new_finished[state_obj.turn][resource] += 1     #add resources to count for current player
+        new_pack = []       #empty backpack completely of current player
 
-    #return new state(node)
-    return State(
-        pos=new_pos,
-        backpack=new_pack,
+    #return new state(node) of players depending on turn
+    if state_obj.turn == 'a':
+        new_state = State(
+        pos_a=new_pos,
+        pos_b=state_obj.pos_b,  #record other player's postion
+        backpack_a=new_pack,
+        backpack_b=state_obj.backpack_b,
         finished=new_finished,
-        resources=new_resources
+        resources=new_resources,
+        turn=next_turn    #switch turn
     )
+    else:
+        new_state = State(
+        pos_a=state_obj.pos_a,  #record other player's postion
+        pos_b=new_pos, 
+        backpack_a=state_obj.backpack_a,
+        backpack_b=new_pack,
+        finished=new_finished,
+        resources=new_resources,
+        turn=next_turn    #switch turn
+    )
+    return new_state
 
 #get_neighbor function
 #I got some help from https://stackoverflow.com/questions/77274736/how-to-find-neighbors-in-a-grid for figuring it out
-def get_neighbor(state, given_map, terrain_costs):
+def get_neighbor(state_obj, given_map, terrain_costs):
     '''
     Return a list of all adjacent(neighbor) states from current state 
     and their movement costs.
     '''
     neighbors = []     #list to be appended and returned at end of function
     rows, columns = len(given_map), len(given_map[0])   #gets the dimensions of the map
-    curr_row, curr_col = state.pos
+
+    #checks for player's turn
+    if state_obj.turn == "a":
+        curr_row, curr_col = state_obj.pos_a
+    else:
+        curr_row, curr_col = state_obj.pos_b
 
     directions = [(-1,0), (1,0), (0,-1), (0,1)] #all the possible directions that can be moved to in a 2-D array
 
@@ -90,7 +150,11 @@ def get_neighbor(state, given_map, terrain_costs):
 
         if 0 <= neighbor_row < rows and 0 <= neighbor_col < columns:    #makes sure that the agent cannot move off the map in error
             new_pos = (neighbor_row, neighbor_col)  #stores neighboring states positions
-            neighbor_state = move_agent(state, new_pos, given_map, terrain_costs)     #call move_agent function to move agent
+            neighbor_state = move_agent(state_obj, new_pos, given_map, terrain_costs)     #call move_agent function to move agent
+
+            ##skip useless branches to limit depth of search##
+            if neighbor_state == state_obj:
+                continue
 
             #get the cost for moved onto tile/terrain
             terrain = given_map[neighbor_row][neighbor_col]
@@ -102,10 +166,15 @@ def get_neighbor(state, given_map, terrain_costs):
     return neighbors
 
 #function to see if the goal has been met(3 stones, 2 irons, and 1 crystal delivered to base)
-def check_goal(state):
-    return (
-        state.finished["Stone"] >= 3 and
-        state.finished["Iron"] >= 2 and
-        state.finished["Crystal"] >= 1
-    )
+##now checks to see if resources have been depleted as either player is unlikely to have all the resources
+def check_goal(state_obj):
+    #have all resources been picked up?
+    for coordinates in state_obj.resources.values():
+        if len(coordinates) > 0:    #at least one resource is still on the map
+            return False
+    
+    #does any players' backpacks still have items inside?
+    if state_obj.backpack_a or state_obj.backpack_b:    #backpacks need to be emptied at corresponding base
+        return False
 
+    return True

@@ -3,63 +3,49 @@
 #admissible heuristic function, used https://www.geeksforgeeks.org/artificial-intelligence/heuristic-function-in-ai/ for help in understanding further
 def heuristic(state):
     '''
-    Guide the search by estimating remaining cost to goal state.
-    Now for two players and calculates Zero-sum payoff
+    Guide the search by estimating remaining cost to goal state
+    Minimum Manhattan distance to nearest needed resource.
+    Distance to base if backpack is full.
     '''
     #initialize empty list of coordinates of resources that need to still be delivered to base
-    #remaining = []
+    remaining = []
     #initialize dict of how many resources are required for goal state from beginning
     required = {
         "Stone": 3,
         "Iron": 2,
         "Crystal": 1
         }
-    
-    #helper function for heuristic
-    def score_player(pos, backpack, finished, player_turn):
-        ''''
-        Gets score of player
-        '''
-        #calculates resources still needed into a dict
-        needed = {}
-        for resource in required:
-            needed[resource] = max(0, required[resource] - finished[resource])
-        
-        #initialize list of remaining coodinates
-        coordinates_remaining = []
-        #get remaining coordinates
-        for resource, count in needed.items():
-            if count > 0:
-                coordinates_remaining.extend(state.resources.get(resource, []))
-
-        #if backpack has resources, return to base
-        if len(backpack) > 0:  #depending on player turn, base is different
-            if player_turn == 'a':
-                base = (0,0)
-            else:
-                base = (4,4)
-            #if at base, slightly higher score
-            if pos == base:
-                return 0
-            #strong incentive to head to base
-            return -10000 * (abs(pos[0] - base[0]) + abs(pos[1] - base[1]))
-        elif coordinates_remaining:
-            #calculate distance to remaining resource that is closest
-            distances = []
-            for resource in coordinates_remaining:
-                distance = abs(pos[0]-resource[0]) + abs(pos[1]-resource[1])
-                distances.append(distance)
-            if distances:
-                return -min(distances)    
+    #initialize empty dict of how many resources are still needed for the goal state
+    needed = {}
+    #loop to iterate and fill in needed    
+    for resource, required in required.items():
+        difference = required - state.finished[resource]    #get the difference between what has been taken to base and still needs to be taken to base
+        if difference > 0:
+            needed[resource] = difference
         else:
-            return -0.1
-    
-    score_a = score_player(state.pos_a, state.backpack_a, state.finished["a"], 'a')
-    score_b = score_player(state.pos_b, state.backpack_b, state.finished["b"], 'b')
+            needed[resource] = 0        #prevents negative values of resources
 
-    #zero sum calc to return
-    diff_delivery = 0
-    for resource in required:
-        diff_delivery += state.finished["a"][resource] - state.finished["b"][resource]
+    #if there is still any resources remaining, put into remaining list so heuristic knows to get them
+    for resource, num in needed.items():
+        if num > 0:     #if there is still a number of resource remaining, add to list with coordinates of them
+            remaining.extend(state.resources[resource])
+
+    #if backpack is full, utilize Manhattan Distance to get back to base (https://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html)
+    if len(state.backpack) == 2:
+        return abs(state.pos[0]) + abs(state.pos[1])    #manahattan distance with absolute values to make sure its computed correctly
     
-    return diff_delivery + score_a - score_b
+    #if no more resources need to be delivered, means we are done
+    if not remaining:
+        return 0
+    
+    #initialize a list that stores distances to each resource needed
+    distances = []
+    for resource in remaining:
+        #manahattan distance with absolute values to make sure its computed correctly
+        dist= abs(state.pos[0] - resource[0]) + abs(state.pos[1] - resource[1])
+        distances.append(dist)
+    #return the smallest distance to closest remaining resource
+    if not distances:   #make sure distances list is not empty to prevent min() function from crashing/acting unexpectedly
+        return 0
+    return min(distances)
+
