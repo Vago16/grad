@@ -60,36 +60,36 @@ class State:
                 f"Turn: {self.turn}")
 
 #move function to handle moving the agent to adjacent tiles
-def move_agent(state, new_pos, given_map, terrain_costs):
+def move_agent(state_obj, new_pos, given_map, terrain_costs):
     '''
     Move the agent(a or b) to a new position on the map and pick up/drop off resources
     '''
     #copy delivered resources to a dict for both players
     new_finished = {
-    "a": dict(state.finished["a"]),
-    "b": dict(state.finished["b"])
+    "a": dict(state_obj.finished["a"]),
+    "b": dict(state_obj.finished["b"])
 }
     #make a dict copy of resouces that will not modify original state
     new_resources = {}
-    for resource, coordinates in state.resources.items(): #iterate through each of the items(resources) and go through each tile on the map
+    for resource, coordinates in state_obj.resources.items(): #iterate through each of the items(resources) and go through each tile on the map
         new_resources[resource] = list(coordinates)
 
     #check player's turn 
-    if state.turn =="a":
-        new_pack = list(state.backpack_a)
+    if state_obj.turn =="a":
+        new_pack = list(state_obj.backpack_a)
         base = (0,0)    #player a's base
-        other_pos = state.pos_b #position of other player
+        other_pos = state_obj.pos_b #position of other player
         next_turn = "b"
     else:
-        new_pack = list(state.backpack_b)
+        new_pack = list(state_obj.backpack_b)
         base = (4,4)    #player b's base
-        other_pos = state.pos_a #position of other player
+        other_pos = state_obj.pos_a #position of other player
         next_turn = "a"
 
 
     ###Conflict Rule###
-    if new_pos == other_pos:    #turn player has priority to move to the tile, so if there is someone already on tile, skip turn
-        return state
+   # if new_pos == other_pos:    #turn player has priority to move to the tile, so if there is someone already on tile, skip turn
+    #    return state
 
     #if the tile has resource and backpack has space, pick up resource
     for resource, coordinate in new_resources.items(): #iterate through coordinates and resource items in the list
@@ -100,25 +100,25 @@ def move_agent(state, new_pos, given_map, terrain_costs):
     #if the tile is the base tile
     if new_pos == base and new_pack:   #(0,0) is always base and makes sure there is a new_pack variable that is True
         for resource in new_pack:
-            new_finished[state.turn][resource] += 1     #add resources to count for current player
+            new_finished[state_obj.turn][resource] += 1     #add resources to count for current player
         new_pack = []       #empty backpack completely of current player
 
     #return new state(node) of players depending on turn
-    if state.turn == 'a':
+    if state_obj.turn == 'a':
         new_state = State(
         pos_a=new_pos,
-        pos_b=state.pos_b,  #record other player's postion
+        pos_b=state_obj.pos_b,  #record other player's postion
         backpack_a=new_pack,
-        backpack_b=state.backpack_b,
+        backpack_b=state_obj.backpack_b,
         finished=new_finished,
         resources=new_resources,
         turn=next_turn    #switch turn
     )
     else:
         new_state = State(
-        pos_a=state.pos_a,  #record other player's postion
+        pos_a=state_obj.pos_a,  #record other player's postion
         pos_b=new_pos, 
-        backpack_a=state.backpack_a,
+        backpack_a=state_obj.backpack_a,
         backpack_b=new_pack,
         finished=new_finished,
         resources=new_resources,
@@ -128,7 +128,7 @@ def move_agent(state, new_pos, given_map, terrain_costs):
 
 #get_neighbor function
 #I got some help from https://stackoverflow.com/questions/77274736/how-to-find-neighbors-in-a-grid for figuring it out
-def get_neighbor(state, given_map, terrain_costs):
+def get_neighbor(state_obj, given_map, terrain_costs):
     '''
     Return a list of all adjacent(neighbor) states from current state 
     and their movement costs.
@@ -137,10 +137,10 @@ def get_neighbor(state, given_map, terrain_costs):
     rows, columns = len(given_map), len(given_map[0])   #gets the dimensions of the map
 
     #checks for player's turn
-    if state.turn == "a":
-        curr_row, curr_col = state.pos_a
+    if state_obj.turn == "a":
+        curr_row, curr_col = state_obj.pos_a
     else:
-        curr_row, curr_col = state.pos_b
+        curr_row, curr_col = state_obj.pos_b
 
     directions = [(-1,0), (1,0), (0,-1), (0,1)] #all the possible directions that can be moved to in a 2-D array
 
@@ -150,10 +150,10 @@ def get_neighbor(state, given_map, terrain_costs):
 
         if 0 <= neighbor_row < rows and 0 <= neighbor_col < columns:    #makes sure that the agent cannot move off the map in error
             new_pos = (neighbor_row, neighbor_col)  #stores neighboring states positions
-            neighbor_state = move_agent(state, new_pos, given_map, terrain_costs)     #call move_agent function to move agent
+            neighbor_state = move_agent(state_obj, new_pos, given_map, terrain_costs)     #call move_agent function to move agent
 
             ##skip useless branches to limit depth of search##
-            if neighbor_state == state:
+            if neighbor_state == state_obj:
                 continue
 
             #get the cost for moved onto tile/terrain
@@ -167,14 +167,14 @@ def get_neighbor(state, given_map, terrain_costs):
 
 #function to see if the goal has been met(3 stones, 2 irons, and 1 crystal delivered to base)
 ##now checks to see if resources have been depleted as either player is unlikely to have all the resources
-def check_goal(state):
+def check_goal(state_obj):
     #have all resources been picked up?
-    for coordinates in state.resources.values():
+    for coordinates in state_obj.resources.values():
         if len(coordinates) > 0:    #at least one resource is still on the map
             return False
     
     #does any players' backpacks still have items inside?
-    if state.backpack_a or state.backpack_b:    #backpacks need to be emptied at corresponding base
+    if state_obj.backpack_a or state_obj.backpack_b:    #backpacks need to be emptied at corresponding base
         return False
 
     return True
