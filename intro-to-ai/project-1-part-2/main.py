@@ -39,7 +39,7 @@ def run_minimax_game(map_name, given_map, terrain_costs, resource_list, depth=11
     print(f"Resources delivered: {state_obj.finished}")
     print(f"Final utility (A - B): {minimax.utility(state_obj)}\n")
 
-def run_rand_game(map_name, given_map, terrain_costs, resource_list, depth=11, max_turn=50):
+def run_rand_game(map_name, given_map, terrain_costs, resource_list, depth=11, max_turn=100):
     '''
     Run game for minimax versus random agent
     '''
