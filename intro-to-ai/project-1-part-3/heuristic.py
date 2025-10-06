@@ -42,7 +42,7 @@ def heuristic(state):
             if pos == base:
                 return 0
             #strong incentive to head to base
-            return -10000 * (abs(pos[0] - base[0]) + abs(pos[1] - base[1]))
+            return -(abs(pos[0] - base[0]) + abs(pos[1] - base[1]))
         elif coordinates_remaining:
             #calculate distance to remaining resource that is closest
             distances = []

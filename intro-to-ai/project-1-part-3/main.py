@@ -75,6 +75,13 @@ def run_rand_game(map_name, given_map, terrain_costs, resource_list, depth=11, m
 
         state_obj = new_state   #go to next state
         turn_count += 1 #increase turn count
+    
+    print(f"\nFinished {map_name}. Final Utility: {minimax.utility(state_obj)}")
+    print(f"--- Game finished after {turn_count} turns ---")
+    print(f"Final positions: A {state_obj.pos_a}, B {state_obj.pos_b}")
+    print(f"Final backpacks: A {state_obj.backpack_a}, B {state_obj.backpack_b}")
+    print(f"Resources delivered: {state_obj.finished}")
+    print(f"Final utility (A - B): {minimax.utility(state_obj)}\n")
 
 ###Run Simulation##
 
