@@ -1,9 +1,12 @@
 import mujoco
-import mujoco.viewer
+#import mujoco.viewer
 import numpy as np
 import time
 import os
 from scipy.spatial.transform import Rotation as R
+#going to use trained model instead of random movements
+from agent import MyRLAgent
+
 
 # Import the simulation class from the provided file
 from simulation import Simulation #
@@ -45,6 +48,14 @@ def print_object_status(sim, obj_body_id):
     print(f"  > Object Position (x, y, z):  ({obj_pos[0]:.4f}, {obj_pos[1]:.4f}, {obj_pos[2]:.4f})")
     print(f"  > Object Z Rotation (degrees): {obj_z_rot:.2f}°")
 
+def get_object_status_string(sim, obj_body_id):
+    '''Prepares output for printing to txt file'''
+    pos = sim.data.xpos[obj_body_id]
+    quat_wxyz = sim.data.xquat[obj_body_id]
+    quat_xyzw = [quat_wxyz[1], quat_wxyz[2], quat_wxyz[3], quat_wxyz[0]]
+    r = R.from_quat(quat_xyzw)
+    obj_z_rot = r.as_euler('xyz', degrees=True)[2]
+    return f"> Object Position (x, y, z): {pos}\n> Object Z Rotation (degrees): {obj_z_rot:.2f}°"
 
 # --- Main Script ---
 def main():
@@ -54,6 +65,20 @@ def main():
     scene_path = os.path.join(os.path.dirname(__file__), "scene.xml") #
     sim = Simulation(scene_path=scene_path)
     sim.load()
+    obj_body_id = mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_BODY, "obj1")
+
+    ##add in RL agent model##
+    MODEL_PATH = "my_agent_final.pth"
+    env_obs_shape = (23,)  # adjust if your environment obs differs
+    env_act_shape = (16,)
+    #initialize in with arg
+    agent = MyRLAgent(
+        obs_space_shape=env_obs_shape,
+        action_space_shape=env_act_shape,
+        device='cpu'
+    )
+    #load model
+    agent.load_model(MODEL_PATH)
 
     # --- 2. Get Object and Joint IDs ---
     try:
@@ -131,6 +156,39 @@ def main():
     print("✅ Students: Try editing 'q_open_angles' and 'q_close_angles'!")
     print("-----------------------------------------------------------")
 
+#headless RL agent action loop (No GUI)
+    EPISODES = 20
+    STEPS_PER_EPISODE = 10
+
+    #create txt file to save action-location-orientation at each step
+    with open("act_lo_or_step_rl.txt", "w") as f:
+        for ep in range(EPISODES):
+            f.write(f"\n=== Episode {ep + 1} ===\n")
+            mujoco.mj_resetData(sim.model, sim.data)
+            obs = np.zeros(env_obs_shape)  # placeholder, update if your Simulation can return obs
+
+            for step in range(STEPS_PER_EPISODE):
+                #get action
+                action, _, _ = agent.get_action_and_value(obs)
+
+                #apply action to actuators
+                for i, act_id in enumerate(sim.hand_act_ids):
+                    sim.data.ctrl[act_id] = action[i]
+
+                mujoco.mj_step(sim.model, sim.data)
+
+                #record object state
+                object_status = get_object_status_string(sim, obj_body_id)
+                step_info = f"Step {step + 1}: Action {action}\n{object_status}\n\n"
+
+                #write to file
+                f.write(step_info)
+                print(step_info, end="")
+
+                time.sleep(0.05)
+
+#####Uncomment to see video of episodes####
+'''
     # --- 6. Launch the Viewer and Start Control Loop ---
     with mujoco.viewer.launch_passive(sim.model, sim.data) as viewer:
         
@@ -171,6 +229,8 @@ def main():
             
             # Pause for observation
             time.sleep(2.0)
+
+    '''
 
 if __name__ == "__main__":
     main()

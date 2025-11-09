@@ -3,7 +3,7 @@ import time
 from inhand_env import CanRotateEnv
 
 # --- TODO: Import your agent class ---
-# from agent import MyRLAgent 
+from agent import MyRLAgent 
 
 # --- Configuration ---
 MODEL_PATH = "my_agent_final.pth" # Path to your saved student model
@@ -13,17 +13,17 @@ EPISODES_TO_RUN = 10
 env = CanRotateEnv(render_mode="human")
 
 # --- TODO: Load your trained agent ---
-# agent = MyRLAgent(
-#     obs_space_shape=env.observation_space.shape,
-#     action_space_shape=env.action_space.shape,
-#     device='cpu'
-# )
-# try:
-#     agent.load_model(MODEL_PATH)
-#     print(f"Successfully loaded model from {MODEL_PATH}")
-# except Exception as e:
-#     print(f"Error loading model: {e}")
-#     exit()
+agent = MyRLAgent(
+    obs_space_shape=env.observation_space.shape,
+    action_space_shape=env.action_space.shape,
+    device='cpu'
+)
+try:
+    agent.load_model(MODEL_PATH)
+    print(f"Successfully loaded model from {MODEL_PATH}")
+except Exception as e:
+    print(f"Error loading model: {e}")
+    exit()
 
 
 # --- Run the evaluation ---
@@ -41,8 +41,7 @@ for episode in range(EPISODES_TO_RUN):
         
         # --- TODO: Get a deterministic action from your agent ---
         # The 'deterministic=True' part is key for testing
-        # action = agent.get_action(obs, deterministic=True)
-        action = env.action_space.sample() # Placeholder: Replace with your agent's action
+        action = agent.get_action(obs, deterministic=True)
         
         # --- TODO: Step the environment ---
         obs, reward, terminated, truncated, info = env.step(action)
