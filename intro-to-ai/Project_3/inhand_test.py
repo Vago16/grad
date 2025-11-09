@@ -10,7 +10,7 @@ MODEL_PATH = "my_agent_final.pth" # Path to your saved student model
 EPISODES_TO_RUN = 10
 
 # --- TODO: Load the environment ---
-env = CanRotateEnv(render_mode="human")
+env = CanRotateEnv(render_mode="headless")  #no GUI
 
 # --- TODO: Load your trained agent ---
 agent = MyRLAgent(
@@ -40,8 +40,7 @@ for episode in range(EPISODES_TO_RUN):
     while not (terminated or truncated):
         
         # --- TODO: Get a deterministic action from your agent ---
-        # The 'deterministic=True' part is key for testing
-        action = agent.get_action(obs, deterministic=True)
+        action, _, _ = agent.get_action_and_value(obs)
         
         # --- TODO: Step the environment ---
         obs, reward, terminated, truncated, info = env.step(action)
