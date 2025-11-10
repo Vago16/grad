@@ -3,7 +3,7 @@ PROJECT3-Part1
 Submitted files:
     inhand_train.py
     inhand_test.py
-    hand_movement_test.py
+    hand_movement_test.py- outputs action, location, and orientation at each step of episodes into act_lo_or_step_rl.txt
     act_lo_or_step_rl.txt- Print-out of the action taken at each time step and location and orientation of the objects at each step
     definition.txt- State space, action space, and reward function with justifications
     my_agent_final.pth- Trained RL model
