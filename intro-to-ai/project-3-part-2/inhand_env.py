@@ -54,7 +54,27 @@ class CanRotateEnv(gym.Env):
         object_pose = self.sim.data.qpos[obj_qpos_adr : obj_qpos_adr + 7] #
         return np.concatenate([finger_qpos, object_pose])
 
+    
     def _calculate_reward(self):
+        # --- Rotation and Survival only ---
+        obj_vel = np.zeros(6)
+        mujoco.mj_objectVelocity(self.sim.model, self.sim.data,
+                                mujoco.mjtObj.mjOBJ_BODY, self.obj_body_id,
+                                obj_vel, 0)
+        angular_velocity_z = obj_vel[2]
+        rotation_reward = angular_velocity_z * 10.0
+        
+        can_pos = self.sim.data.xpos[self.obj_body_id]
+        palm_pos = self.sim.data.site_xpos[self.site_id]
+        distance_from_palm = np.linalg.norm(can_pos - palm_pos)
+        survival_reward = 0.1 - distance_from_palm
+
+        # Combine rewards only
+        total_reward = rotation_reward + survival_reward
+        return total_reward
+
+
+    ''' def _calculate_reward(self):
         # --- Rotation and Survival Rewards ---
         obj_vel = np.zeros(6)
         mujoco.mj_objectVelocity(self.sim.model, self.sim.data, mujoco.mjtObj.mjOBJ_BODY, self.obj_body_id, obj_vel, 0)
@@ -98,7 +118,7 @@ class CanRotateEnv(gym.Env):
         # Combine all reward components
         total_reward = rotation_reward + survival_reward + contact_reward
         return total_reward
-
+'''
     def _is_terminated(self):
         can_z_pos = self.sim.data.xpos[self.obj_body_id][2] #
         palm_z_pos = self.sim.data.site_xpos[self.site_id][2] #

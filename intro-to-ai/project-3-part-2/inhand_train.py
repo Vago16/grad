@@ -1,119 +1,127 @@
-# inhand_train.py (Student Skeleton)
+# q_train_agent.py
 import os
 import numpy as np
-import time
-from inhand_env import CanRotateEnv 
-# --- TODO: Import your agent class ---
-from agent import MyRLAgent  # e.g., PPOAgent
-
-# Create a directory to save logs and models
-log_dir = "my_agent_logs/"
-os.makedirs(log_dir, exist_ok=True)
+from inhand_env import CanRotateEnv
+from q_wrapper import QEnvWrapper
 
 # --- Configuration ---
-TOTAL_TIMESTEPS = 25_000     #changed for quicker learning and without my cpu giving out
-STEPS_PER_COLLECT = 1024  # How many steps to run per "collect" phase, changed for quicker learning to help responsiveness 
-LEARNING_RATE = 3e-4
-DEVICE = 'cpu' # 'cuda' or 'cpu'
+EPISODES = 1000
+MAX_STEPS = 200
+ALPHA = 0.15          #learning rate
+GAMMA = 0.99         #discount factor
+EPSILON = 1.0        #initial exploration rate
+EPSILON_DECAY = 0.995
+MIN_EPSILON = 0.05
+NUM_BINS = 8       #discretization for Z-rotation, 45 degrees each
+INCLUDE_HEIGHT = False  #originally thought I needed height of cube
 
-# --- TODO: Initialize the Environment ---
-env = CanRotateEnv(render_mode="headless")
-print(f"Observation space: {env.observation_space.shape}")
-print(f"Action space: {env.action_space.shape}")
+#variables to help stuck state
+STUCK_THRESHOLD = 15   #if agent stays in same state this many steps, scale up actions
+MAX_SCALE = 3.0        #max multiplier
+SCALE_INCREMENT = 0.7  # ow much to increase each time stuck
+DECAY_SCALE = 0.99     #decay factor when moving
 
-# --- TODO: Initialize your Agent ---
-agent = MyRLAgent(
-     obs_space_shape=env.observation_space.shape,
-     action_space_shape=env.action_space.shape,
-     learning_rate=LEARNING_RATE,
-     device=DEVICE
- )
-# agent.load_model("my_agent.pth") # Optional: to continue training
+action_scale = 1.0     #initial scale
+prev_state = None
+stuck_counter = 0
 
-print("Starting training...")
+# Create directory for saving logs
+log_dir = "q_training_logs"
+os.makedirs(log_dir, exist_ok=True)
 
-# --- TODO: Write the main training loop ---
-# This is just one example of an on-policy (like PPO) training loop.
-# An off-policy loop (like DDPG/SAC) would look different.
+# --- Initialize environment ---
+#base_env = CanRotateEnv(render_mode="headless")  # no GUI
+#env = QEnvWrapper(base_env)
+base_env = CanRotateEnv(render_mode="headless")
+env = QEnvWrapper(base_env, num_bins=NUM_BINS, include_height=False)    #with only z-rotation
 
-obs, info = env.reset()
-global_step = 0
 
-while global_step < TOTAL_TIMESTEPS:
-    
-    # --- 1. Collect a batch of experiences ---
-    obs_buf = []
-    act_buf = []
-    adv_buf = []
-    ret_buf = []
-    logp_buf = []
-    reward_buf = []  
-    value_buf = []   
-    
-    print(f"Collecting trajectory... (Step {global_step}/{TOTAL_TIMESTEPS})")
-    
-    for _ in range(STEPS_PER_COLLECT):
-        # --- TODO: Get an action from your agent's policy ---
-        action, log_prob, value = agent.get_action_and_value(obs)
-        #action = env.action_space.sample() # Placeholder: Replace with your agent's action
-        
-        # --- TODO: Step the environment ---
-        next_obs, reward, terminated, truncated, info = env.step(action)
-        
-        # --- TODO: Store the transition in your buffer ---
-        obs_buf.append(obs)
-        act_buf.append(action)
-        logp_buf.append(log_prob.cpu().numpy())
-        value_buf.append(value.cpu().numpy().squeeze())
-        reward_buf.append(reward)
-        
-        global_step += 1
-        obs = next_obs
-        
-        #handle episode end
+
+print(f"Num discrete states: {env.num_states}")
+print(f"Num discrete actions: {len(env.macro_actions)}")
+
+# --- Initialize Q-table ---
+Q = np.zeros((env.num_states, len(env.macro_actions)), dtype=np.float32)
+
+episode_rewards = []
+
+#for increasing computation speed and clogging up with logs
+log_every = 25
+
+# --- Training loop ---
+for ep in range(EPISODES):
+    state = env.reset()
+    total_reward = 0
+    start_angle = env.get_z_rotation(env.env.sim.data.qpos) #initial rotation
+    epsilon = max(MIN_EPSILON, EPSILON * (EPSILON_DECAY ** ep)) #epsilomn decay
+
+    #in case of stuck bin
+    prev_state = None
+    stuck_counter = 0
+
+    for step in range(MAX_STEPS):
+        #epsilon greedy action selection
+        if np.random.rand() < epsilon:
+            action_index = np.random.randint(len(env.macro_actions))
+        else:
+            action_index = np.argmax(Q[state])
+
+        #step in environment
+        #next_state, reward, terminated, truncated, info = env.step(macro_action)
+        next_state, reward, terminated, truncated, info = env.step(action_index)
+
+        #adapt macro-actions if stuck
+        if prev_state == next_state:
+            stuck_counter += 1
+        else:
+            stuck_counter = 0
+            env.action_scale = max(1.0, env.action_scale * DECAY_SCALE)
+            env.macro_actions = [a * env.action_scale for a in env.base_macro_actions]
+
+        if stuck_counter >= STUCK_THRESHOLD:
+            env.action_scale = min(MAX_SCALE, env.action_scale + SCALE_INCREMENT)
+            env.macro_actions = [a * env.action_scale for a in env.base_macro_actions]
+            stuck_counter = 0
+
+        prev_state = next_state
+
+        #incentivize rotation in reward
+        # Get current rotation angle
+        current_angle = env.get_z_rotation(env.env.sim.data.qpos)
+        rotated_angle = abs(current_angle - start_angle)
+
+        #add progress-based reward
+        reward += 0.1 * rotated_angle   # small bonus proportional to rotation
+
+        #Give a large bonus if 90 degrees is reached
+        if rotated_angle >= np.pi / 2:
+            reward += 5.0
+            done = True
+
+        #Q-learning update
+        #q learning algorithm
+        Q[state, action_index] += ALPHA * (reward + GAMMA * np.max(Q[next_state]) - Q[state, action_index])
+
+        state = next_state
+        total_reward += reward
+
+        # --- Debug prints to see progress ---
+        if step % log_every == 0:
+            print(f"Ep {ep} Step {step} | state={state}, action={action_index}, reward={reward:.2f}, next_state={next_state}, done={terminated}")
+
+
         if terminated or truncated:
-            print(f"Episode finished at step {global_step}.")
-            obs, info = env.reset()
+            break
 
-    ###compute returns and advantages
-    #convert buffer lists to np arrays, data format need for PyTorch
-    obs_buf = np.array(obs_buf, dtype=np.float32)
-    act_buf = np.array(act_buf, dtype=np.float32)
-    reward_buf = np.array(reward_buf, dtype=np.float32)
-    value_buf = np.array(value_buf, dtype=np.float32)
-    logp_buf = np.array(logp_buf, dtype=np.float32)
+    episode_rewards.append(total_reward)
 
-    #variables for computing
-    gamma = 0.99  #discount factor
-    lam = 0.95    #GAE lambda(Generalized Advantage Estimationa)
+    # --- Episode summary ---
+    print(f"Episode {ep} finished | Total reward: {total_reward:.2f} | Steps: {step+1} | Epsilon: {epsilon:.3f}")
 
-    #compute advantage
-    adv_buf = np.zeros_like(reward_buf)
-    lastgaelam = 0
-    for t in reversed(range(len(reward_buf))):
-        next_value = value_buf[t + 1] if t + 1 < len(reward_buf) else 0
-        delta = reward_buf[t] + gamma * next_value - value_buf[t]
-        adv_buf[t] = lastgaelam = delta + gamma * lam * lastgaelam
+# --- Save Q-table and history ---
+np.save(os.path.join(log_dir, "q_table.npy"), Q)
+np.savez(os.path.join(log_dir, "train_history.npz"),
+         rewards=episode_rewards)
 
-    #compute returns
-    ret_buf = adv_buf + value_buf
-    ret_buf = ret_buf.astype(np.float32)  #ensure float32
-
-    # --- 2. Update the agent's policy ---
-    # (This is where you'd calculate advantages, PPO clip loss, etc.)
-    print("Updating policy...")
-    # --- TODO: Call your agent's update/learn function ---
-    agent.learn(obs_buf, act_buf, adv_buf, ret_buf, logp_buf)
-
-    # --- 3. Save the model periodically ---
-    if global_step % 50000 == 0:
-        save_path = f"my_agent_logs/model_step_{global_step}.pth"
-        # --- TODO: Implement your agent's save method ---
-        agent.save_model(save_path)
-        print(f"Model saved to {save_path}")
-
-
-# --- TODO: Final save and cleanup ---
-agent.save_model("my_agent_final.pth")
-env.close()
-print("Training finished.")
+print("Training complete. Q-table saved.")
+base_env.close()

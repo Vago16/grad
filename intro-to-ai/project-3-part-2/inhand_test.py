@@ -1,57 +1,92 @@
-# inhand_test.py (Student Skeleton)
+# q_test_agent.py
 import time
+import numpy as np
 from inhand_env import CanRotateEnv
-
-# --- TODO: Import your agent class ---
-from agent import MyRLAgent 
+from q_wrapper import QEnvWrapper
 
 # --- Configuration ---
-MODEL_PATH = "my_agent_final.pth" # Path to your saved student model
-EPISODES_TO_RUN = 10
+Q_TABLE_PATH = "q_training_logs/q_table.npy"
+NUM_BINS = 8
+NUM_TRIALS = 200
+rotation_threshold = np.pi / 2   # 90 degrees
+MAX_STEPS = 200
+OUTPUT_FILE = "rotation_times.txt"
 
-# --- TODO: Load the environment ---
-env = CanRotateEnv(render_mode="headless")  #no GUI
+# --- Load environment ---
+base_env = CanRotateEnv(render_mode="headless")
+env = QEnvWrapper(base_env, num_bins=NUM_BINS, include_height=False)
 
-# --- TODO: Load your trained agent ---
-agent = MyRLAgent(
-    obs_space_shape=env.observation_space.shape,
-    action_space_shape=env.action_space.shape,
-    device='cpu'
-)
+# --- Load Q-table ---
 try:
-    agent.load_model(MODEL_PATH)
-    print(f"Successfully loaded model from {MODEL_PATH}")
+    Q = np.load(Q_TABLE_PATH)
+    print(f"Successfully loaded Q-table from {Q_TABLE_PATH}")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    print(f"Error loading Q-table: {e}")
     exit()
 
+rotation_times = []
 
-# --- Run the evaluation ---
-for episode in range(EPISODES_TO_RUN):
-    print(f"--- Starting Episode {episode + 1} ---")
-    
-    # --- TODO: Reset the environment ---
-    obs, info = env.reset()
-    
-    terminated = False
-    truncated = False
-    total_reward = 0
-    
-    while not (terminated or truncated):
-        
-        # --- TODO: Get a deterministic action from your agent ---
-        action, _, _ = agent.get_action_and_value(obs)
-        
-        # --- TODO: Step the environment ---
-        obs, reward, terminated, truncated, info = env.step(action)
-        
-        total_reward += reward
-        
-        # Render/sleep is handled by the environment's step/render methods
-        time.sleep(1/60) # Keep visualization smooth
-        
-    print(f"Episode {episode + 1} finished. Total Reward: {total_reward:.2f}")
+# open file to write
+with open(OUTPUT_FILE, "w") as f:
+    f.write("Trial,Time(s),Steps,Success\n")
 
-# Clean up
-env.close()
-print("\nEvaluation finished.")
+    for trial in range(NUM_TRIALS):
+        print(f"\nStarting trial {trial+1}...")
+        state = env.reset()
+
+        start_angle = env.get_z_rotation(env.env.sim.data.qpos)
+        done = False
+        step_count = 0
+        start_time = time.time()
+        success = False
+
+        max_rotated_angle = 0
+        while not done and step_count < MAX_STEPS:
+            action = np.argmax(Q[state])
+            step_result = env.step(action)
+
+            if len(step_result) == 5:
+                next_state, reward, terminated, truncated, info = step_result
+                done = terminated or truncated
+            else:
+                next_state, reward, done, info = step_result
+
+            state = next_state
+
+            current_angle = env.get_z_rotation(env.env.sim.data.qpos)
+            rotated_angle = abs(current_angle - start_angle)
+
+            #track maximum rotation in episode
+            if rotated_angle > max_rotated_angle:
+                max_rotated_angle = rotated_angle
+
+            if rotated_angle >= rotation_threshold:
+                success = True
+                break
+
+            step_count += 1
+
+        end_time = time.time()
+        elapsed = end_time - start_time
+        rotation_times.append(elapsed)
+
+        #print each trial result
+        if success:
+            print(f"Trial {trial+1} — Reached 90° in {elapsed:.3f}s (steps: {step_count})")
+        else:
+            print(f"Trial {trial+1} — FAILED")
+
+        
+        f.write(f"{trial+1},{elapsed:.3f},{step_count},{success}\n")
+
+    #write summary to output file
+    average_time = sum(rotation_times) / NUM_TRIALS
+    f.write(f"\nAverage Time: {average_time:.3f}s\n")
+    f.write(f"Fastest Time: {min(rotation_times):.3f}s\n")
+    f.write(f"Slowest Time: {max(rotation_times):.3f}s\n")
+
+#print summary to log
+print(f"\nAverage time to rotate 90° over {NUM_TRIALS} trials: {average_time:.2f} seconds")
+print(f"Fastest time: {min(rotation_times):.2f}s")
+print(f"Slowest time: {max(rotation_times):.2f}s")
+print(f"Results also written to {OUTPUT_FILE}")
