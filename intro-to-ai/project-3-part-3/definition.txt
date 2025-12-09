@@ -1,0 +1,40 @@
+State space definition and justification
+	    The state space is the environment that the agent is in, 
+    and can freely observe all needed info to complete its tasks at a given moment 
+    in time(medium.com).  It also includes its history/memory, which has previous state’s 
+    data stored so it can access that data to make decisions to complete its current goals.
+	    In this project, the state includes the position of each joint in the hand, velocity of the hand, and the orientation and position 
+    of the object that the hand is holding.  These are all needed by the agent to learn how to manipulate the 
+    object in the hand.  This assists it in its goal of rotating the object to a desired orientation.
+
+
+Action space definition and justification
+        The action space is defined as all the possible actions an agent can take within an
+    environment(milvus.io). It can either be discrete(finite set of choices) or continuous(range of possible value).  
+    The agent in this project utilizes a continuous action space.
+        It is continuous in the sense that there are many possible actions that can be taken, such as changing the values 
+    being -1 to 1 of the actuators on the fingers to manipulate the object.  Continuous range lets there be 
+    fine motor control rather than coarser movement that might have happened if it could only move in increments of .5 
+    instead of smaller, as it can now.
+
+
+Reward function and justification
+	    The reward function in reinforcement learning is the main driving force in the
+    agent being able to complete a given task(geeksforgeeks).  After doing an action, 
+    the reward function immediately gives feedback whether the model got closer to the given 
+    task(positive), further(negative), or neutral(zero), as examples.  The positive reward 
+    values are used to incentivize the agent as it completes tasks that get it closer to the goal, 
+    and negative reward is to disincentivize it from going further.   It maximizes cumulative reward over time, and as it gets better, 
+    leads the agent closer to the goal.
+	    In this project, an example reward function would reward positive points 
+    as it orients/manipulates the object closer to the goal, and reward negative points 
+    as it orients/manipulates the object further away.  By both rewarding successful movements 
+    and penalizing failed movements, the agent learns how to orient the object quicker and more efficiently.
+
+
+Works Cited
+https://medium.com/@CalebMBowyer/what-is-state-in-reinforcement-learning-it-is-what-the-engineer-says-it-is-47add99a1121
+
+https://milvus.io/ai-quick-reference/what-is-an-action-space-in-rl
+
+https://www.geeksforgeeks.org/machine-learning/how-to-make-a-reward-function-in-reinforcement-learning/
