@@ -16,7 +16,9 @@ Important files:
 
     dqb_test_results.txt: contains the episode, reward, and if the test was a success or failure for each episode
 
+    test.MOV: video of output of inhand_test.py
+
 
 NOTES:
-    I was not able to record a video as the functions required to access the GUI are not supported anymore for MacOS.  I instead switched to a fully command line version of the model instead.  Please run inhand_test.py to see the performance of the deep q learning agent.
+    I was not able to record a video as the functions required to access the GUI are not supported anymore for MacOS.  I instead switched to a fully command line version of the model instead.  Please run inhand_test.py to see the performance of the deep q learning agent.  I also included a video of the terminal print statements as the training is occurring.
     
