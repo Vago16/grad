@@ -7,28 +7,23 @@ import torch.optim as optim
 from collections import deque
 from inhand_env import CanRotateEnv
 
-#hyperparemeters 
-EPISODES = 500
+#hyperparemeters
+EPISODES = 550
 STEPS_PER_EPISODE = 200
-
 LR = 1e-3
 GAMMA = 0.99
-
 EPSILON = 1.0
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.05
-
 MEMORY_SIZE = 50000
 BATCH_SIZE = 64
 TARGET_UPDATE = 50
-
 NUM_ACTIONS = 8
 
-#device
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-#neural network initialization
+#deep q learning
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
@@ -43,138 +38,110 @@ class DQN(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-#macro actions taken from q_wrapper
+#macro actions of joint movements
 def get_macro_actions():
     return [
-        np.array([ 0.03]*16),                     # 0: Open fingers
-        np.array([-0.03]*16),                     # 1: Close fingers
-        np.array([ 0.02]*8 + [-0.02]*8),          # 2: Twist CW
-        np.array([-0.02]*8 + [ 0.02]*8),          # 3: Twist CCW
-        np.array([ 0.01]*16),                     # 4: Slight expand
-        np.array([-0.01]*16),                     # 5: Slight contract
-        np.zeros(16),                              # 6: Nothing
-        np.array([0.015, -0.015]*8)               # 7: Small twist
+        np.array([ 0.30]*16),                     # 0: open fingers
+        np.array([-0.30]*16),                     # 1: close fingers
+        np.array([ 0.35]*8 + [-0.35]*8),          # 2: twist CW
+        np.array([-0.35]*8 + [ 0.35]*8),          # 3: twist CCW
+        np.array([ 0.10]*16),                     # 4: expand
+        np.array([-0.10]*16),                     # 5: contract
+        np.zeros(16),                             # 6: nothing
+        np.array([-0.25, 0.25]*8)               # 7: alternate twist
     ]
 
-#replay memory for network
+# --- Replay memory ---
 memory = deque(maxlen=MEMORY_SIZE)
 
 def store_experience(exp):
     memory.append(exp)
 
-
 def sample_batch():
     batch = random.sample(memory, BATCH_SIZE)
     states, actions, rewards, next_states, dones = zip(*batch)
-    #convert lists to single numpy arrays to speed up training
-    states_np = np.array(states, dtype=np.float32)
-    next_states_np = np.array(next_states, dtype=np.float32)
-    actions_np = np.array(actions, dtype=np.int64)
-    rewards_np = np.array(rewards, dtype=np.float32)
-    dones_np = np.array(dones, dtype=np.float32)
-
     return (
-        torch.from_numpy(states_np),
-        torch.from_numpy(actions_np),
-        torch.from_numpy(rewards_np),
-        torch.from_numpy(next_states_np),
-        torch.from_numpy(dones_np)
+        torch.from_numpy(np.array(states, dtype=np.float32)),
+        torch.from_numpy(np.array(actions, dtype=np.int64)),
+        torch.from_numpy(np.array(rewards, dtype=np.float32)),
+        torch.from_numpy(np.array(next_states, dtype=np.float32)),
+        torch.from_numpy(np.array(dones, dtype=np.float32))
     )
 
-
-#deep q learning neural network setup
-env = CanRotateEnv(render_mode="headless")
-obs, info = env.reset()
-state_dim = len(obs)
-
-policy_net = DQN(state_dim, NUM_ACTIONS)
-target_net = DQN(state_dim, NUM_ACTIONS)
-target_net.load_state_dict(policy_net.state_dict())
-target_net.eval()
-
-
-optimizer = optim.Adam(policy_net.parameters(), lr=LR)
-macro_actions = get_macro_actions()
-
 #training loop
-log_file = open("dqn_training_log.txt", "w")
-
-#move networks to device for faster computing
-policy_net.to(device)
-target_net.to(device)
-
-for ep in range(EPISODES):
+def train():
+    env = CanRotateEnv(render_mode="headless")
     obs, info = env.reset()
-    total_reward = 0
+    state_dim = len(obs)
 
-    for step in range(STEPS_PER_EPISODE):
+    policy_net = DQN(state_dim, NUM_ACTIONS).to(device)
+    target_net = DQN(state_dim, NUM_ACTIONS).to(device)
+    target_net.load_state_dict(policy_net.state_dict())
+    target_net.eval()
 
-        #epsilon-greedy action
-        if random.random() < EPSILON:
-            action_idx = np.random.randint(NUM_ACTIONS)
-        else:
-            with torch.no_grad():
-                obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device)
-                q_vals = policy_net(obs_tensor)
-                action_idx = torch.argmax(q_vals).item()
+    optimizer = optim.Adam(policy_net.parameters(), lr=LR)
+    macro_actions = get_macro_actions()
 
-        action = macro_actions[action_idx]
+    log_file = open("dqn_training_log.txt", "w")
 
-        #step environment
-        next_obs, reward, terminated, truncated, info = env.step(action)
-        done = terminated or truncated
+    global EPSILON
 
-        #clip reward for stability
-        reward_clipped = np.clip(reward, -1.0, 1.0)
+    for ep in range(EPISODES):
+        obs, info = env.reset()
+        total_reward = 0
 
-        #store experience
-        store_experience((obs, action_idx, reward_clipped, next_obs, done))
+        for step in range(STEPS_PER_EPISODE):
+            if random.random() < EPSILON:
+                action_idx = np.random.randint(NUM_ACTIONS)
+            else:
+                with torch.no_grad():
+                    obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device)
+                    q_vals = policy_net(obs_tensor)
+                    action_idx = torch.argmax(q_vals).item()
 
-        obs = next_obs
-        total_reward += reward
+            action = macro_actions[action_idx]
+            next_obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
 
-        #train from memory, minimum memory helps reduce early noise
-        MIN_MEMORY_BEFORE_TRAIN = 1000
-        if len(memory) >= MIN_MEMORY_BEFORE_TRAIN:
-            states, actions, rewards, next_states, dones = sample_batch()
+            reward_clipped = np.clip(reward, -1.0, 1.0)
+            store_experience((obs, action_idx, reward_clipped, next_obs, done))
 
-            #move tensors to device for faster computing
-            states = states.to(device)
-            actions = actions.to(device)
-            rewards = rewards.to(device)
-            next_states = next_states.to(device)
-            dones = dones.to(device)
+            obs = next_obs
+            total_reward += reward
 
-            #compute Q_target
-            with torch.no_grad():
-                next_q = target_net(next_states).max(dim=1)[0]
-                q_target = rewards + GAMMA * next_q * (1 - dones)
+            MIN_MEMORY_BEFORE_TRAIN = 1000
+            if len(memory) >= MIN_MEMORY_BEFORE_TRAIN:
+                states, actions, rewards, next_states, dones = sample_batch()
+                states, actions, rewards, next_states, dones = \
+                    states.to(device), actions.to(device), rewards.to(device), next_states.to(device), dones.to(device)
 
-            #compute Q_current
-            q_values = policy_net(states)
-            q_current = q_values.gather(1, actions.unsqueeze(1)).squeeze()
+                with torch.no_grad():
+                    next_q = target_net(next_states).max(dim=1)[0]
+                    q_target = rewards + GAMMA * next_q * (1 - dones)
 
-            #loss function
-            loss = nn.MSELoss()(q_current, q_target)
+                q_values = policy_net(states)
+                q_current = q_values.gather(1, actions.unsqueeze(1)).squeeze()
+                loss = nn.MSELoss()(q_current, q_target)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-        #end episode
-        if done:
-            break
+            if done:
+                break
 
-    # pdate target network periodically
-    if ep % TARGET_UPDATE == 0:
-        target_net.load_state_dict(policy_net.state_dict())
+        if ep % TARGET_UPDATE == 0:
+            target_net.load_state_dict(policy_net.state_dict())
 
-    #epsilon decay, exponential
-    EPSILON = max(MIN_EPSILON, EPSILON * EPSILON_DECAY)
+        EPSILON = max(MIN_EPSILON, EPSILON * EPSILON_DECAY)
 
-    print(f"EP {ep}, reward={total_reward:.3f}, eps={EPSILON:.3f}")
-    log_file.write(f"{ep} {total_reward}\n")
+        print(f"EP {ep}, reward={total_reward:.3f}, eps={EPSILON:.3f}")
+        log_file.write(f"{ep} {total_reward}\n")
 
-log_file.close()
-torch.save(policy_net.state_dict(), "dqn_agent.pth")
-print("Training complete!")
+    log_file.close()
+    torch.save(policy_net.state_dict(), "dqn_agent.pth")
+    print("Training complete!")
+
+#run when executed directly
+if __name__ == "__main__":
+    train()
