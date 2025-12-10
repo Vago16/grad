@@ -1,92 +1,68 @@
-# q_test_agent.py
-import time
+import torch
 import numpy as np
 from inhand_env import CanRotateEnv
-from q_wrapper import QEnvWrapper
+from inhand_train import DQN, get_macro_actions  
 
-# --- Configuration ---
-Q_TABLE_PATH = "q_training_logs/q_table.npy"
-NUM_BINS = 8
-NUM_TRIALS = 200
-rotation_threshold = np.pi / 2   # 90 degrees
-MAX_STEPS = 200
-OUTPUT_FILE = "rotation_times.txt"
+# --- Parameters ---
+NUM_ACTIONS = 8
+NUM_TEST_EPISODES = 100
+STEPS_PER_EPISODE = 200 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Load environment ---
-base_env = CanRotateEnv(render_mode="headless")
-env = QEnvWrapper(base_env, num_bins=NUM_BINS, include_height=False)
+env = CanRotateEnv(render_mode="human")  # or 'headless' for faster testing
+obs, info = env.reset()
+state_dim = len(obs)
 
-# --- Load Q-table ---
-try:
-    Q = np.load(Q_TABLE_PATH)
-    print(f"Successfully loaded Q-table from {Q_TABLE_PATH}")
-except Exception as e:
-    print(f"Error loading Q-table: {e}")
-    exit()
+# --- Load trained model ---
+policy_net = DQN(state_dim, NUM_ACTIONS)
+policy_net.load_state_dict(torch.load("dqn_agent.pth", map_location=device))
+policy_net.eval()
 
-rotation_times = []
+macro_actions = get_macro_actions()
 
-# open file to write
-with open(OUTPUT_FILE, "w") as f:
-    f.write("Trial,Time(s),Steps,Success\n")
+# --- Testing ---
+total_rewards = []
+successful_rotations = 0
+episode_results = []
 
-    for trial in range(NUM_TRIALS):
-        print(f"\nStarting trial {trial+1}...")
-        state = env.reset()
+for ep in range(NUM_TEST_EPISODES):
+    obs, info = env.reset()
+    ep_reward = 0
+    rotation_done = False
 
-        start_angle = env.get_z_rotation(env.env.sim.data.qpos)
-        done = False
-        step_count = 0
-        start_time = time.time()
-        success = False
+    for step in range(STEPS_PER_EPISODE):
+        with torch.no_grad():
+            obs_tensor = torch.tensor(obs, dtype=torch.float32)
+            q_vals = policy_net(obs_tensor)
+            action_idx = torch.argmax(q_vals).item()
 
-        max_rotated_angle = 0
-        while not done and step_count < MAX_STEPS:
-            action = np.argmax(Q[state])
-            step_result = env.step(action)
+        action = macro_actions[action_idx]
+        obs, reward, terminated, truncated, info = env.step(action)
+        ep_reward += reward
 
-            if len(step_result) == 5:
-                next_state, reward, terminated, truncated, info = step_result
-                done = terminated or truncated
-            else:
-                next_state, reward, done, info = step_result
+        #check if cube rotated 90 degrees
+        if not rotation_done and abs(obs[90]) >= np.pi/2:
+            rotation_done = True
+            successful_rotations += 1
 
-            state = next_state
+        if terminated or truncated:
+            break
 
-            current_angle = env.get_z_rotation(env.env.sim.data.qpos)
-            rotated_angle = abs(current_angle - start_angle)
+    total_rewards.append(ep_reward)
+    episode_results.append(rotation_done)
+    status = "SUCCESS" if rotation_done else "FAIL"
+    print(f"Episode {ep}: reward={ep_reward:.2f}, {status}")
 
-            #track maximum rotation in episode
-            if rotated_angle > max_rotated_angle:
-                max_rotated_angle = rotated_angle
+#save results
+with open("dqn_test_results.txt", "w") as f:
+    f.write("Episode | Reward | 90deg Rotation\n")
+    f.write("--------------------------------\n")
+    for ep, (r, success) in enumerate(zip(total_rewards, episode_results)):
+        status = "SUCCESS" if success else "FAIL"
+        f.write(f"{ep} | {r:.2f} | {status}\n")
+    f.write("\n")
+    f.write(f"Total successful 90 degree rotations: {successful_rotations} / {NUM_TEST_EPISODES}\n")
 
-            if rotated_angle >= rotation_threshold:
-                success = True
-                break
-
-            step_count += 1
-
-        end_time = time.time()
-        elapsed = end_time - start_time
-        rotation_times.append(elapsed)
-
-        #print each trial result
-        if success:
-            print(f"Trial {trial+1} — Reached 90° in {elapsed:.3f}s (steps: {step_count})")
-        else:
-            print(f"Trial {trial+1} — FAILED")
-
-        
-        f.write(f"{trial+1},{elapsed:.3f},{step_count},{success}\n")
-
-    #write summary to output file
-    average_time = sum(rotation_times) / NUM_TRIALS
-    f.write(f"\nAverage Time: {average_time:.3f}s\n")
-    f.write(f"Fastest Time: {min(rotation_times):.3f}s\n")
-    f.write(f"Slowest Time: {max(rotation_times):.3f}s\n")
-
-#print summary to log
-print(f"\nAverage time to rotate 90° over {NUM_TRIALS} trials: {average_time:.2f} seconds")
-print(f"Fastest time: {min(rotation_times):.2f}s")
-print(f"Slowest time: {max(rotation_times):.2f}s")
-print(f"Results also written to {OUTPUT_FILE}")
+print("Testing complete!")
+print(f"Total successful 90 degree rotations: {successful_rotations}/{NUM_TEST_EPISODES}")

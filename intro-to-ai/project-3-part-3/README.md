@@ -1,4 +1,9 @@
-PROJECT3-Part2
+PROJECT3-Part3
+
+Research:
+    https://www.geeksforgeeks.org/deep-learning/deep-q-learning/
+    https://www.qwak.com/post/a-brief-introduction-to-reinforcement-learning-deep-q-learning
+    
 
 Important files:
     Project-3-Part-2-Summary.docx: contains Training history and the changes of rewards during training, any figures that show the training progress, and a report of the average time needed to rotate the cube by 90 degrees for 200 times.
@@ -11,11 +16,7 @@ Important files:
 
     read_training.py: reads training log and creates matplot lib of rewards
 
-    q_training_logs/: folder containing q-table and training log model
-            |
-             -q_table.npy: trained model of q-table
-            |
-             -train_history.npz: model containing training logs, accessed with read_training.py
+    
     
 
 

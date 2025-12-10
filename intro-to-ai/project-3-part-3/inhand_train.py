@@ -1,127 +1,180 @@
-# q_train_agent.py
 import os
+import random
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from collections import deque
 from inhand_env import CanRotateEnv
-from q_wrapper import QEnvWrapper
 
-# --- Configuration ---
-EPISODES = 1000
-MAX_STEPS = 200
-ALPHA = 0.15          #learning rate
-GAMMA = 0.99         #discount factor
-EPSILON = 1.0        #initial exploration rate
+#hyperparemeters 
+EPISODES = 500
+STEPS_PER_EPISODE = 200
+
+LR = 1e-3
+GAMMA = 0.99
+
+EPSILON = 1.0
 EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.05
-NUM_BINS = 8       #discretization for Z-rotation, 45 degrees each
-INCLUDE_HEIGHT = False  #originally thought I needed height of cube
 
-#variables to help stuck state
-STUCK_THRESHOLD = 15   #if agent stays in same state this many steps, scale up actions
-MAX_SCALE = 3.0        #max multiplier
-SCALE_INCREMENT = 0.7  # ow much to increase each time stuck
-DECAY_SCALE = 0.99     #decay factor when moving
+MEMORY_SIZE = 50000
+BATCH_SIZE = 64
+TARGET_UPDATE = 50
 
-action_scale = 1.0     #initial scale
-prev_state = None
-stuck_counter = 0
+NUM_ACTIONS = 8
 
-# Create directory for saving logs
-log_dir = "q_training_logs"
-os.makedirs(log_dir, exist_ok=True)
-
-# --- Initialize environment ---
-#base_env = CanRotateEnv(render_mode="headless")  # no GUI
-#env = QEnvWrapper(base_env)
-base_env = CanRotateEnv(render_mode="headless")
-env = QEnvWrapper(base_env, num_bins=NUM_BINS, include_height=False)    #with only z-rotation
+#device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+#neural network initialization
+class DQN(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, output_dim)
+        )
 
-print(f"Num discrete states: {env.num_states}")
-print(f"Num discrete actions: {len(env.macro_actions)}")
+    def forward(self, x):
+        return self.model(x)
 
-# --- Initialize Q-table ---
-Q = np.zeros((env.num_states, len(env.macro_actions)), dtype=np.float32)
+#macro actions taken from q_wrapper
+def get_macro_actions():
+    return [
+        np.array([ 0.03]*16),                     # 0: Open fingers
+        np.array([-0.03]*16),                     # 1: Close fingers
+        np.array([ 0.02]*8 + [-0.02]*8),          # 2: Twist CW
+        np.array([-0.02]*8 + [ 0.02]*8),          # 3: Twist CCW
+        np.array([ 0.01]*16),                     # 4: Slight expand
+        np.array([-0.01]*16),                     # 5: Slight contract
+        np.zeros(16),                              # 6: Nothing
+        np.array([0.015, -0.015]*8)               # 7: Small twist
+    ]
 
-episode_rewards = []
+#replay memory for network
+memory = deque(maxlen=MEMORY_SIZE)
 
-#for increasing computation speed and clogging up with logs
-log_every = 25
+def store_experience(exp):
+    memory.append(exp)
 
-# --- Training loop ---
+
+def sample_batch():
+    batch = random.sample(memory, BATCH_SIZE)
+    states, actions, rewards, next_states, dones = zip(*batch)
+    #convert lists to single numpy arrays to speed up training
+    states_np = np.array(states, dtype=np.float32)
+    next_states_np = np.array(next_states, dtype=np.float32)
+    actions_np = np.array(actions, dtype=np.int64)
+    rewards_np = np.array(rewards, dtype=np.float32)
+    dones_np = np.array(dones, dtype=np.float32)
+
+    return (
+        torch.from_numpy(states_np),
+        torch.from_numpy(actions_np),
+        torch.from_numpy(rewards_np),
+        torch.from_numpy(next_states_np),
+        torch.from_numpy(dones_np)
+    )
+
+
+#deep q learning neural network setup
+env = CanRotateEnv(render_mode="headless")
+obs, info = env.reset()
+state_dim = len(obs)
+
+policy_net = DQN(state_dim, NUM_ACTIONS)
+target_net = DQN(state_dim, NUM_ACTIONS)
+target_net.load_state_dict(policy_net.state_dict())
+target_net.eval()
+
+
+optimizer = optim.Adam(policy_net.parameters(), lr=LR)
+macro_actions = get_macro_actions()
+
+#training loop
+log_file = open("dqn_training_log.txt", "w")
+
+#move networks to device for faster computing
+policy_net.to(device)
+target_net.to(device)
+
 for ep in range(EPISODES):
-    state = env.reset()
+    obs, info = env.reset()
     total_reward = 0
-    start_angle = env.get_z_rotation(env.env.sim.data.qpos) #initial rotation
-    epsilon = max(MIN_EPSILON, EPSILON * (EPSILON_DECAY ** ep)) #epsilomn decay
 
-    #in case of stuck bin
-    prev_state = None
-    stuck_counter = 0
+    for step in range(STEPS_PER_EPISODE):
 
-    for step in range(MAX_STEPS):
-        #epsilon greedy action selection
-        if np.random.rand() < epsilon:
-            action_index = np.random.randint(len(env.macro_actions))
+        #epsilon-greedy action
+        if random.random() < EPSILON:
+            action_idx = np.random.randint(NUM_ACTIONS)
         else:
-            action_index = np.argmax(Q[state])
+            with torch.no_grad():
+                obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device)
+                q_vals = policy_net(obs_tensor)
+                action_idx = torch.argmax(q_vals).item()
 
-        #step in environment
-        #next_state, reward, terminated, truncated, info = env.step(macro_action)
-        next_state, reward, terminated, truncated, info = env.step(action_index)
+        action = macro_actions[action_idx]
 
-        #adapt macro-actions if stuck
-        if prev_state == next_state:
-            stuck_counter += 1
-        else:
-            stuck_counter = 0
-            env.action_scale = max(1.0, env.action_scale * DECAY_SCALE)
-            env.macro_actions = [a * env.action_scale for a in env.base_macro_actions]
+        #step environment
+        next_obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
 
-        if stuck_counter >= STUCK_THRESHOLD:
-            env.action_scale = min(MAX_SCALE, env.action_scale + SCALE_INCREMENT)
-            env.macro_actions = [a * env.action_scale for a in env.base_macro_actions]
-            stuck_counter = 0
+        #clip reward for stability
+        reward_clipped = np.clip(reward, -1.0, 1.0)
 
-        prev_state = next_state
+        #store experience
+        store_experience((obs, action_idx, reward_clipped, next_obs, done))
 
-        #incentivize rotation in reward
-        # Get current rotation angle
-        current_angle = env.get_z_rotation(env.env.sim.data.qpos)
-        rotated_angle = abs(current_angle - start_angle)
-
-        #add progress-based reward
-        reward += 0.1 * rotated_angle   # small bonus proportional to rotation
-
-        #Give a large bonus if 90 degrees is reached
-        if rotated_angle >= np.pi / 2:
-            reward += 5.0
-            done = True
-
-        #Q-learning update
-        #q learning algorithm
-        Q[state, action_index] += ALPHA * (reward + GAMMA * np.max(Q[next_state]) - Q[state, action_index])
-
-        state = next_state
+        obs = next_obs
         total_reward += reward
 
-        # --- Debug prints to see progress ---
-        if step % log_every == 0:
-            print(f"Ep {ep} Step {step} | state={state}, action={action_index}, reward={reward:.2f}, next_state={next_state}, done={terminated}")
+        #train from memory, minimum memory helps reduce early noise
+        MIN_MEMORY_BEFORE_TRAIN = 1000
+        if len(memory) >= MIN_MEMORY_BEFORE_TRAIN:
+            states, actions, rewards, next_states, dones = sample_batch()
 
+            #move tensors to device for faster computing
+            states = states.to(device)
+            actions = actions.to(device)
+            rewards = rewards.to(device)
+            next_states = next_states.to(device)
+            dones = dones.to(device)
 
-        if terminated or truncated:
+            #compute Q_target
+            with torch.no_grad():
+                next_q = target_net(next_states).max(dim=1)[0]
+                q_target = rewards + GAMMA * next_q * (1 - dones)
+
+            #compute Q_current
+            q_values = policy_net(states)
+            q_current = q_values.gather(1, actions.unsqueeze(1)).squeeze()
+
+            #loss function
+            loss = nn.MSELoss()(q_current, q_target)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        #end episode
+        if done:
             break
 
-    episode_rewards.append(total_reward)
+    # pdate target network periodically
+    if ep % TARGET_UPDATE == 0:
+        target_net.load_state_dict(policy_net.state_dict())
 
-    # --- Episode summary ---
-    print(f"Episode {ep} finished | Total reward: {total_reward:.2f} | Steps: {step+1} | Epsilon: {epsilon:.3f}")
+    #epsilon decay, exponential
+    EPSILON = max(MIN_EPSILON, EPSILON * EPSILON_DECAY)
 
-# --- Save Q-table and history ---
-np.save(os.path.join(log_dir, "q_table.npy"), Q)
-np.savez(os.path.join(log_dir, "train_history.npz"),
-         rewards=episode_rewards)
+    print(f"EP {ep}, reward={total_reward:.3f}, eps={EPSILON:.3f}")
+    log_file.write(f"{ep} {total_reward}\n")
 
-print("Training complete. Q-table saved.")
-base_env.close()
+log_file.close()
+torch.save(policy_net.state_dict(), "dqn_agent.pth")
+print("Training complete!")
