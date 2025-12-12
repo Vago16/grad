@@ -1,0 +1,96 @@
+# Object files
+*.o
+*.obj
+
+# Executables
+*.exe
+a.out
+
+# Libraries
+*.lib
+*.so
+*.dll
+
+# Debug information
+*.dSYM/
+*.su
+*.idb
+*.pdb
+*.log
+
+# Temporary files
+*~
+*.tmp
+*.bak
+*.swp
+
+# Build directories (if used)
+build/
+bin/
+obj/
+
+# IDE specific files (e.g., Visual Studio, Eclipse, VS Code)
+.vs/
+.vscode/
+.project
+.cproject
+.settings/
+*.user
+*.filters
+*.vcproj
+*.vcxproj
+*.sln
+*.suo
+HW4/test_vectors/Alice
+HW4/test_vectors/Bob
+HW4/test_vectors/KeyGen
+HW4/test_vectors/PK_Hex.txt
+HW4/test_vectors/SH_Hex.txt
+HW4/test_vectors/alice_c.txt
+HW4/test_vectors/alice_d.txt
+HW4/test_vectors/alice_signature.txt
+HW4/Demo_Files/bob_ecdh
+HW4/Demo_Files/alice_ecdh
+revert_liboqs.sh
+HW5/test_vectors/Part 1/Dilithium_signature.txt
+HW5/test_vectors/Part 1/alice
+HW5/test_vectors/Part 1/alice_shared_secret.txt
+HW5/test_vectors/Part 1/bob
+HW5/test_vectors/Part 1/bob_shared_secret.txt
+HW5/test_vectors/Part 1/dilithium_signature.txt
+HW5/test_vectors/Part 1/kyber_ciphertext.txt
+HW5/test_vectors/Part 2/alice
+HW5/test_vectors/Part 2/alice_final_key.txt
+HW5/test_vectors/Part 2/alice_k2.txt
+HW5/test_vectors/Part 2/bob
+HW5/test_vectors/Part 2/bob_dilithium_signature.txt
+HW5/test_vectors/Part 2/bob_final_key.txt
+HW5/test_vectors/Part 2/bob_k2.txt
+HW5/test_vectors/Part 2/bob_kyber_ciphertext.txt
+MP2/Alice
+MP2/AliceKeys.txt
+MP2/AlicePublicKey.txt
+MP2/Bob
+MP2/BobKeys.txt
+MP2/BobPublicKey.txt
+MP2/CertificateAuthority
+MP2/DecryptedMessage.txt
+MP2/Params.txt
+MP2/SigncryptedMessage.txt
+MP2/Signcryption.txt
+MP2/Verification.txt
+HW6/ecc_baf_sign_and_update
+HW6/ecc_baf_verify
+HW6/private_state.txt
+HW6/reconstructed_k.txt
+HW6/signature.txt
+HW6/reconstructed_r.txt
+HW6/verify_result.txt
+HW7/Alice
+HW7/Bob
+HW7/Server
+HW7/alice_r.txt
+HW7/alice_x.txt
+HW7/bob_r.txt
+HW7/bob_x.txt
+HW7/ciphertext_alice.txt
