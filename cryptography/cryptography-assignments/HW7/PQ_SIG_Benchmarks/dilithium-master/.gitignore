@@ -1,0 +1,16 @@
+PQCsignKAT_Dilithium2.req
+PQCsignKAT_Dilithium2.rsp
+PQCsignKAT_Dilithium3.req
+PQCsignKAT_Dilithium3.rsp
+PQCsignKAT_Dilithium5.req
+PQCsignKAT_Dilithium5.rsp
+tvecs2
+tvecs3
+tvecs5
+ref/test/test_time2
+ref/test/test_time3
+ref/test/test_time5
+avx2/test/test_time2
+avx2/test/test_time3
+avx2/test/test_time5
+*/test/test_time*
